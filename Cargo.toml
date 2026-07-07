@@ -1,0 +1,43 @@
+[package]
+name = "audio-tui"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+#backend = { path = "backend", package = "audio-backend" }
+#colored = "3"
+crossterm = "0.29"
+#log = "0.4"
+ratatui = "0.30"
+#simplelog = "0.12"
+
+[lints.rust]
+absolute_paths_not_starting_with_crate = "warn"
+redundant_imports = "warn"
+redundant_lifetimes = "warn"
+single_use_lifetimes = "warn"
+unreachable_pub = "warn"
+unused_crate_dependencies = "warn"
+unused_extern_crates = "warn"
+unused_lifetimes = "warn"
+
+[lints.clippy]
+
+# pedantic
+pedantic = { level = "warn", priority = -1 }
+needless_pass_by_value = "allow"
+
+# restriction
+empty_structs_with_brackets = "warn"
+if_then_some_else_none = "warn"
+print_stderr = "warn"
+print_stdout = "warn"
+rc_buffer = "warn"
+redundant_type_annotations = "warn"
+ref_patterns = "warn"
+renamed_function_params = "warn"
+self_named_module_files = "warn"
+semicolon_inside_block = "warn"
+str_to_string = "warn"
+unneeded_field_pattern = "warn"
+verbose_file_reads = "warn"
