@@ -7,7 +7,14 @@ use ratatui::widgets::{Block, Paragraph};
 use crate::model::Model;
 
 pub fn view(model: &Model, frame: &mut Frame) {
-    let title = Line::from(" Counter App Tutorial ".bold());
+    let title = Line::from(format!(" {} {} ", env!("CARGO_PKG_NAME"), env!("VERSION")).bold());
+    let con_state = if model.connected() {
+        //Line::from(" \u{f0c52} ".green())
+        Line::from(" \u{f0132} ".green())
+    } else {
+        //Line::from(" \u{f0131} ".red())
+        Line::from(" \u{f012e} ".red())
+    };
     let instructions = Line::from(vec![
         " Decrement ".into(),
         "<Left>".blue().bold(),
@@ -18,6 +25,7 @@ pub fn view(model: &Model, frame: &mut Frame) {
     ]);
     let block = Block::bordered()
         .title(title.centered())
+        .title(con_state.right_aligned())
         .title_bottom(instructions.centered())
         .border_set(border::THICK);
 

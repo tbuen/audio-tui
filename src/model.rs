@@ -1,16 +1,46 @@
-#[derive(Default)]
+use std::sync::mpsc::Receiver;
+
+use backend::{Backend, Event};
+
 pub struct Model {
+    _backend: Backend,
+    receiver: Receiver<Event>,
+    connected: bool,
     counter: u8,
-    wants_exit: bool,
+    exit: bool,
 }
 
 impl Model {
-    pub fn wants_exit(&self) -> bool {
-        self.wants_exit
+    pub fn new() -> Self {
+        let backend = Backend::new();
+        let receiver = backend.receiver().unwrap();
+        Model {
+            _backend: backend,
+            receiver,
+            connected: Default::default(),
+            counter: Default::default(),
+            exit: Default::default(),
+        }
     }
 
-    pub fn exit(&mut self) {
-        self.wants_exit = true;
+    pub fn receiver(&self) -> &Receiver<Event> {
+        &self.receiver
+    }
+
+    pub fn exit(&self) -> bool {
+        self.exit
+    }
+
+    pub fn set_exit(&mut self) {
+        self.exit = true;
+    }
+
+    pub fn connected(&self) -> bool {
+        self.connected
+    }
+
+    pub fn set_connected(&mut self, val: bool) {
+        self.connected = val;
     }
 
     pub fn counter(&self) -> u8 {

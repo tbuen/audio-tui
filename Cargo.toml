@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-#backend = { path = "backend", package = "audio-backend" }
+backend = { path = "backend", package = "audio-backend" }
 #colored = "3"
 crossterm = "0.29"
 #log = "0.4"
