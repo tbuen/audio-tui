@@ -1,7 +1,8 @@
 use std::time::Duration;
 
+use backend::{Event, Sync};
 use crossterm::event;
-use crossterm::event::{Event, KeyCode, KeyEvent, KeyEventKind};
+use crossterm::event::{KeyCode, KeyEvent, KeyEventKind};
 
 use crate::model::Model;
 use crate::update::Message;
@@ -11,10 +12,10 @@ pub fn handle_event(model: &Model) -> Message {
     while msg.is_none() {
         if let Ok(true) = event::poll(Duration::from_millis(10)) {
             match event::read().unwrap() {
-                Event::Key(key_event) if key_event.kind == KeyEventKind::Press => {
+                event::Event::Key(key_event) if key_event.kind == KeyEventKind::Press => {
                     msg = handle_key(key_event);
                 }
-                Event::Resize(_, _) => msg = Some(Message::Resize),
+                event::Event::Resize(_, _) => msg = Some(Message::Resize),
                 _ => {}
             }
         }
@@ -30,16 +31,21 @@ pub fn handle_event(model: &Model) -> Message {
 fn handle_key(key_event: KeyEvent) -> Option<Message> {
     match key_event.code {
         KeyCode::Char('q') => Some(Message::Quit),
-        KeyCode::Left => Some(Message::Decrement),
-        KeyCode::Right => Some(Message::Increment),
+        KeyCode::Char('s') => Some(Message::SyncFiles),
+        KeyCode::Char('j') | KeyCode::Down => Some(Message::NextFile),
+        KeyCode::Char('k') | KeyCode::Up => Some(Message::PrevFile),
+        KeyCode::Char('l') | KeyCode::Right => Some(Message::EnterDir),
+        KeyCode::Char('h') | KeyCode::Left => Some(Message::LeaveDir),
         _ => None,
     }
 }
 
-fn handle_backend(event: backend::Event) -> Option<Message> {
+fn handle_backend(event: Event) -> Option<Message> {
     match event {
-        backend::Event::Connected => Some(Message::ConnectionState(true)),
-        backend::Event::Disconnected => Some(Message::ConnectionState(false)),
+        Event::Connected => Some(Message::ConnectionState(true)),
+        Event::Disconnected => Some(Message::ConnectionState(false)),
+        // TODO handle errors as well...
+        Event::FileSync(Ok(Sync::Completed)) => Some(Message::FilesSynced),
         _ => None,
     }
 }

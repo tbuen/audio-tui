@@ -1,12 +1,15 @@
 use std::sync::mpsc::Receiver;
 
-use backend::{Backend, Event};
+use backend::{Backend, ChangeDirectory, Event};
+use ratatui::widgets::ListState;
 
 pub struct Model {
-    _backend: Backend,
+    backend: Backend,
     receiver: Receiver<Event>,
     connected: bool,
-    counter: u8,
+    current: String,
+    files: Vec<String>,
+    list_state: ListState,
     exit: bool,
 }
 
@@ -15,10 +18,12 @@ impl Model {
         let backend = Backend::new();
         let receiver = backend.receiver().unwrap();
         Model {
-            _backend: backend,
+            backend,
             receiver,
             connected: Default::default(),
-            counter: Default::default(),
+            current: String::new(),
+            files: Vec::new(),
+            list_state: ListState::default(),
             exit: Default::default(),
         }
     }
@@ -43,15 +48,67 @@ impl Model {
         self.connected = val;
     }
 
-    pub fn counter(&self) -> u8 {
-        self.counter
+    pub fn refresh_file_list(&mut self) {
+        if let Ok(mut c) = self.backend.current_directory() {
+            self.current = c.pop().unwrap();
+        }
+        if let Ok(c) = self.backend.directory_content() {
+            self.files = c.dirs;
+        }
+        if self.files.is_empty() {
+            self.list_state.select(None);
+        } else {
+            self.list_state.select_first();
+        }
     }
 
-    pub fn increment_counter(&mut self) {
-        self.counter += 1;
+    pub fn sync_files(&self) {
+        self.backend.sync_files();
     }
 
-    pub fn decrement_counter(&mut self) {
-        self.counter -= 1;
+    pub fn select_next(&mut self) {
+        if let Some(cur) = self.list_state.selected()
+            && cur + 1 < self.files.len()
+        {
+            self.list_state.select_next();
+        }
+    }
+
+    pub fn select_prev(&mut self) {
+        if self.list_state.selected().is_some() {
+            self.list_state.select_previous();
+        }
+    }
+
+    pub fn enter_dir(&mut self) {
+        if let Some(cur) = self.list_state.selected()
+            && let Some(dir) = self.files.get(cur)
+        {
+            self.backend
+                .change_directory(ChangeDirectory::ToChild(dir))
+                .unwrap();
+            self.refresh_file_list();
+        }
+    }
+
+    pub fn leave_dir(&mut self) {
+        if !self.current().is_empty() {
+            self.backend
+                .change_directory(ChangeDirectory::ToParent)
+                .unwrap();
+            self.refresh_file_list();
+        }
+    }
+
+    pub fn current(&self) -> &str {
+        &self.current
+    }
+
+    pub fn files(&self) -> Vec<&str> {
+        self.files.iter().map(AsRef::as_ref).collect()
+    }
+
+    pub fn list_state(&self) -> &ListState {
+        &self.list_state
     }
 }
