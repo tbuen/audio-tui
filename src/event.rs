@@ -45,7 +45,7 @@ fn handle_backend(event: Event) -> Option<Message> {
         Event::Connected => Some(Message::ConnectionState(true)),
         Event::Disconnected => Some(Message::ConnectionState(false)),
         // TODO handle errors as well...
-        Event::FileSync(Ok(Sync::Completed)) => Some(Message::FilesSynced),
+        Event::FileSync(Sync::Completed) => Some(Message::FilesSynced),
         _ => None,
     }
 }
