@@ -1,6 +1,6 @@
 use std::time::Duration;
 
-use backend::{Event, Sync};
+use backend::{Event, FileSync, TagSync};
 use crossterm::event;
 use crossterm::event::{KeyCode, KeyEvent, KeyEventKind};
 
@@ -24,6 +24,9 @@ pub fn handle_event(model: &Model) -> Message {
         {
             msg = handle_backend(evt);
         }
+        if msg.is_none() && model.last_tick().elapsed() >= Duration::from_millis(100) {
+            msg = Some(Message::Tick);
+        }
     }
     msg.unwrap()
 }
@@ -32,6 +35,7 @@ fn handle_key(key_event: KeyEvent) -> Option<Message> {
     match key_event.code {
         KeyCode::Char('q') => Some(Message::Quit),
         KeyCode::Char('s') => Some(Message::SyncFiles),
+        KeyCode::Char('S') => Some(Message::SyncTags),
         KeyCode::Char('j') | KeyCode::Down => Some(Message::NextFile),
         KeyCode::Char('k') | KeyCode::Up => Some(Message::PrevFile),
         KeyCode::Char('l') | KeyCode::Right => Some(Message::EnterDir),
@@ -45,7 +49,13 @@ fn handle_backend(event: Event) -> Option<Message> {
         Event::Connected => Some(Message::ConnectionState(true)),
         Event::Disconnected => Some(Message::ConnectionState(false)),
         // TODO handle errors as well...
-        Event::FileSync(Sync::Completed) => Some(Message::FilesSynced),
+        Event::FileSync(FileSync::Started) => Some(Message::FileSyncStarted),
+        Event::FileSync(FileSync::Completed) => Some(Message::FileSyncCompleted),
+        Event::FileSync(FileSync::Aborted) => Some(Message::FileSyncAborted),
+        Event::TagSync(TagSync::Started) => Some(Message::TagSyncStarted),
+        Event::TagSync(TagSync::Completed) => Some(Message::TagSyncCompleted),
+        Event::TagSync(TagSync::Aborted) => Some(Message::TagSyncAborted),
+        Event::TagSync(TagSync::Step(n, t)) => Some(Message::TagSyncStep(n, t)),
         _ => None,
     }
 }

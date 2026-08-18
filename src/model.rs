@@ -1,16 +1,22 @@
 use std::sync::mpsc::Receiver;
+use std::time::Instant;
 
 use backend::{Backend, ChangeDirectory, Event};
 use ratatui::widgets::ListState;
+use throbber_widgets_tui::ThrobberState;
 
 pub struct Model {
     backend: Backend,
     receiver: Receiver<Event>,
+    exit: bool,
     connected: bool,
+    last_tick: Instant,
+    throbber_state: ThrobberState,
+    throbbing: bool,
+    gauge: Option<u16>,
     current: String,
     files: Vec<String>,
     list_state: ListState,
-    exit: bool,
 }
 
 impl Model {
@@ -20,11 +26,15 @@ impl Model {
         Model {
             backend,
             receiver,
-            connected: Default::default(),
+            exit: false,
+            connected: false,
+            last_tick: Instant::now(),
+            throbber_state: ThrobberState::default(),
+            throbbing: false,
+            gauge: None,
             current: String::new(),
             files: Vec::new(),
             list_state: ListState::default(),
-            exit: Default::default(),
         }
     }
 
@@ -40,12 +50,49 @@ impl Model {
         self.exit = true;
     }
 
+    pub fn tick(&mut self) {
+        self.throbber_state.calc_next();
+        self.last_tick = Instant::now();
+    }
+
+    pub fn last_tick(&self) -> Instant {
+        self.last_tick
+    }
+
     pub fn connected(&self) -> bool {
         self.connected
     }
 
     pub fn set_connected(&mut self, val: bool) {
         self.connected = val;
+    }
+
+    pub fn throbbing(&self) -> bool {
+        self.throbbing
+    }
+
+    pub fn set_throbbing(&mut self, val: bool) {
+        self.throbbing = val;
+    }
+
+    pub fn throbber_state(&self) -> ThrobberState {
+        self.throbber_state.clone()
+    }
+
+    pub fn gauge(&self) -> Option<u16> {
+        self.gauge
+    }
+
+    pub fn set_gauge(&mut self, val: Option<u16>) {
+        self.gauge = val;
+    }
+
+    pub fn sync_files(&self) {
+        self.backend.sync_files();
+    }
+
+    pub fn sync_tags(&self) {
+        self.backend.sync_tags();
     }
 
     pub fn refresh_file_list(&mut self) {
@@ -60,10 +107,6 @@ impl Model {
         } else {
             self.list_state.select_first();
         }
-    }
-
-    pub fn sync_files(&self) {
-        self.backend.sync_files();
     }
 
     pub fn select_next(&mut self) {

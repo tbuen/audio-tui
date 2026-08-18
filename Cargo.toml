@@ -10,6 +10,7 @@ crossterm = "0.29"
 #log = "0.4"
 ratatui = "0.30"
 #simplelog = "0.12"
+throbber-widgets-tui = "0.11"
 
 [lints.rust]
 absolute_paths_not_starting_with_crate = "warn"

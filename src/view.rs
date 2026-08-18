@@ -1,20 +1,69 @@
 use ratatui::Frame;
 use ratatui::layout::{Constraint, Layout};
-use ratatui::style::{Color, Modifier, Stylize};
-use ratatui::symbols::border;
-use ratatui::text::{Line, Text};
-use ratatui::widgets::{Block, List, Paragraph};
+use ratatui::style::{Color, Modifier, Style, Stylize};
+use ratatui::symbols::{border, line};
+use ratatui::text::{Line, Span, Text};
+use ratatui::widgets::{Block, LineGauge, List, Paragraph};
+use throbber_widgets_tui::Throbber;
 
 use crate::model::Model;
 
-pub fn view(model: &Model, frame: &mut Frame) {
+pub fn view(model: &mut Model, frame: &mut Frame) {
+    let layout = Layout::vertical([Constraint::Min(1), Constraint::Percentage(100)]);
+    let [top_area, main_area] = layout.areas(frame.area());
+
+    // top
+
+    let title = Span::from(format!(
+        "{} {}",
+        env!("CARGO_PKG_NAME"),
+        env!("VERSION").bold(),
+    ));
+
+    let con_state = if model.connected() {
+        "\u{f0132}".green()
+    } else {
+        "\u{f012e}".red()
+    };
+
+    let layout = Layout::horizontal([
+        Constraint::Min(1),
+        Constraint::Percentage(100),
+        #[allow(clippy::cast_possible_truncation)]
+        Constraint::Min(title.width() as u16),
+        Constraint::Min(1),
+    ])
+    .horizontal_margin(1)
+    .spacing(1);
+
+    let [throb_area, gauge_area, title_area, con_area] = layout.areas(top_area);
+
+    if model.throbbing() {
+        let throb = Throbber::default()
+            .throbber_set(throbber_widgets_tui::BRAILLE_EIGHT_DOUBLE)
+            .style(Style::default().bold());
+        frame.render_stateful_widget(throb, throb_area, &mut model.throbber_state());
+    }
+
+    if let Some(p) = model.gauge() {
+        let gauge = LineGauge::default()
+            .filled_symbol(line::THICK_HORIZONTAL)
+            .ratio(f64::from(p) / 100.0);
+        frame.render_widget(gauge, gauge_area);
+    }
+
+    frame.render_widget(title, title_area);
+    frame.render_widget(con_state, con_area);
+
+    // main
+
     let layout = Layout::horizontal([
         Constraint::Min(40),
         Constraint::Percentage(100),
         Constraint::Min(40),
     ]);
 
-    let [left, _, right] = layout.areas(frame.area());
+    let [left, _, right] = layout.areas(main_area);
 
     // left
 
@@ -35,7 +84,7 @@ pub fn view(model: &Model, frame: &mut Frame) {
 
     let block = Block::bordered()
         .title(current.bold())
-        .title_bottom(Line::from(format!(" {} of {} ", sel, items.len())).right_aligned())
+        .title_bottom(Line::from(format!(" {}/{} ", sel, items.len())).right_aligned())
         .border_set(border::THICK);
 
     let list = List::new(items)
@@ -48,16 +97,6 @@ pub fn view(model: &Model, frame: &mut Frame) {
 
     // right
 
-    let title = Line::from(format!(" {} {} ", env!("CARGO_PKG_NAME"), env!("VERSION")).bold());
-
-    let con_state = if model.connected() {
-        //Line::from(" \u{f0c52} ".green())
-        Line::from(" \u{f0132} ".green())
-    } else {
-        //Line::from(" \u{f0131} ".red())
-        Line::from(" \u{f012e} ".red())
-    };
-
     let instructions = Line::from(vec![
         " Decrement ".into(),
         "<Left>".blue().bold(),
@@ -67,8 +106,6 @@ pub fn view(model: &Model, frame: &mut Frame) {
         "<Q> ".blue().bold(),
     ]);
     let block = Block::bordered()
-        .title(title.centered())
-        .title(con_state.right_aligned())
         .title_bottom(instructions.centered())
         .border_set(border::THICK);
 
