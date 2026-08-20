@@ -15,6 +15,7 @@ pub enum Message {
     PrevFile,
     EnterDir,
     LeaveDir,
+    Error(String),
     Quit,
     Resize,
     Tick,
@@ -43,6 +44,7 @@ pub fn update(model: &mut Model, msg: Message) {
         Message::PrevFile => model.select_prev(),
         Message::EnterDir => model.enter_dir(),
         Message::LeaveDir => model.leave_dir(),
+        Message::Error(s) => model.set_toast(s),
         Message::Quit => model.set_exit(),
         Message::Resize => {}
         Message::Tick => model.tick(),

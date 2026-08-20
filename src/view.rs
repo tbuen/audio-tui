@@ -3,7 +3,7 @@ use ratatui::layout::{Constraint, Layout};
 use ratatui::style::{Color, Modifier, Style, Stylize};
 use ratatui::symbols::{border, line};
 use ratatui::text::{Line, Span, Text};
-use ratatui::widgets::{Block, LineGauge, List, Paragraph};
+use ratatui::widgets::{Block, LineGauge, List, Paragraph, Widget};
 use throbber_widgets_tui::Throbber;
 
 use crate::model::Model;
@@ -119,4 +119,8 @@ pub fn view(model: &mut Model, frame: &mut Frame) {
     frame.render_widget(paragraph, right);
 
     //frame.render_widget(paragraph, frame.area());
+
+    let engine = model.toast_engine();
+    engine.set_area(main_area);
+    engine.render(main_area, frame.buffer_mut());
 }

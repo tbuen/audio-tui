@@ -1,8 +1,13 @@
-use std::sync::mpsc::Receiver;
 use std::time::Instant;
+use std::{sync::mpsc::Receiver, time::Duration};
 
 use backend::{Backend, ChangeDirectory, Event};
+use ratatui::layout::Rect;
 use ratatui::widgets::ListState;
+use ratatui_comfy_toaster::{
+    ToastBuilder, ToastEngine, ToastEngineBuilder, ToastPosition, ToastPreset,
+    ToastProgressBarStyle, ToastType,
+};
 use throbber_widgets_tui::ThrobberState;
 
 pub struct Model {
@@ -17,6 +22,7 @@ pub struct Model {
     current: String,
     files: Vec<String>,
     list_state: ListState,
+    toast_engine: ToastEngine<()>,
 }
 
 impl Model {
@@ -35,6 +41,11 @@ impl Model {
             current: String::new(),
             files: Vec::new(),
             list_state: ListState::default(),
+            toast_engine: ToastEngineBuilder::new(Rect::new(0, 0, 120, 40))
+                .default_duration(Duration::from_secs(3))
+                .default_progress_bar(true)
+                .default_progress_bar_style(ToastProgressBarStyle::Minimal)
+                .build(),
         }
     }
 
@@ -52,11 +63,26 @@ impl Model {
 
     pub fn tick(&mut self) {
         self.throbber_state.calc_next();
+        self.toast_engine().tick();
         self.last_tick = Instant::now();
     }
 
     pub fn last_tick(&self) -> Instant {
         self.last_tick
+    }
+
+    pub fn set_toast(&mut self, text: String) {
+        self.toast_engine.show_toast(
+            ToastBuilder::new(text.into())
+                .preset(ToastPreset::CompactHighlightStart, "Error")
+                .toast_type(ToastType::Error)
+                .position(ToastPosition::TopRight)
+                .offset(0, 1),
+        );
+    }
+
+    pub fn toast_engine(&mut self) -> &mut ToastEngine<()> {
+        &mut self.toast_engine
     }
 
     pub fn connected(&self) -> bool {

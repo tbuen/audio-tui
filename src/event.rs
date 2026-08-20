@@ -56,6 +56,7 @@ fn handle_backend(event: Event) -> Option<Message> {
         Event::TagSync(TagSync::Completed) => Some(Message::TagSyncCompleted),
         Event::TagSync(TagSync::Aborted) => Some(Message::TagSyncAborted),
         Event::TagSync(TagSync::Step(n, t)) => Some(Message::TagSyncStep(n, t)),
+        Event::Error(e) => Some(Message::Error(e.to_string())),
         _ => None,
     }
 }
