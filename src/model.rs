@@ -106,13 +106,16 @@ impl Model {
         let current = self.backend.fileview_current().pop().unwrap_or_default();
         let content = match self.backend.fileview_content() {
             FileViewContent::Folders(folders) => folders,
-            FileViewContent::Files { .. } => Vec::new(),
+            FileViewContent::Files { tracks, .. } => tracks,
         };
         self.fileview = View::new(current, content, select);
     }
 
     pub fn fileview_enter(&mut self) {
-        if let Some(dir) = self.fileview.enter() {
+        if let Some(dir) = self.fileview.enter()
+            && let FileViewContent::Folders(folders) = self.backend.fileview_content()
+            && folders.iter().find(|f| *f == dir).is_some()
+        {
             self.backend
                 .fileview_change(ChangeDirection::ToChild(dir))
                 .unwrap();
@@ -151,7 +154,12 @@ impl Model {
     }
 
     pub fn tagview_enter(&mut self) {
-        if let Some(dir) = self.tagview.enter() {
+        if let Some(dir) = self.tagview.enter()
+            && let TagViewContent::Genres(v)
+            | TagViewContent::Artists(v)
+            | TagViewContent::Albums(v) = self.backend.tagview_content()
+            && v.iter().find(|f| *f == dir).is_some()
+        {
             self.backend
                 .tagview_change(ChangeDirection::ToChild(dir))
                 .unwrap();
