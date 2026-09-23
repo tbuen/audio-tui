@@ -1,12 +1,12 @@
 use ratatui::Frame;
-use ratatui::layout::{Constraint, Layout};
+use ratatui::layout::{Constraint, Layout, Rect};
 use ratatui::style::{Color, Modifier, Style, Stylize};
 use ratatui::symbols::{border, line};
 use ratatui::text::{Line, Span, Text};
 use ratatui::widgets::{Block, LineGauge, List, Paragraph, Widget};
 use throbber_widgets_tui::Throbber;
 
-use crate::model::Model;
+use crate::model::{Model, Pane, View};
 
 pub fn view(model: &mut Model, frame: &mut Frame) {
     let layout = Layout::vertical([Constraint::Min(1), Constraint::Percentage(100)]);
@@ -67,33 +67,14 @@ pub fn view(model: &mut Model, frame: &mut Frame) {
 
     // left
 
-    let mut current = model.current().to_owned();
-    if !current.is_empty() {
-        current.insert(0, ' ');
-        current.push(' ');
+    match model.active_pane() {
+        Pane::Files => {
+            render_list(model.fileview(), frame, left);
+        }
+        Pane::Tags => {
+            render_list(model.tagview(), frame, left);
+        }
     }
-
-    let items = model.files();
-
-    let mut state = *model.list_state();
-
-    let sel = match state.selected() {
-        Some(idx) => idx + 1,
-        None => 0,
-    };
-
-    let block = Block::bordered()
-        .title(current.bold())
-        .title_bottom(Line::from(format!(" {}/{} ", sel, items.len())).right_aligned())
-        .border_set(border::THICK);
-
-    let list = List::new(items)
-        .style(Color::Black)
-        .highlight_style(Modifier::REVERSED)
-        .highlight_symbol("> ")
-        .block(block);
-
-    frame.render_stateful_widget(list, left, &mut state);
 
     // right
 
@@ -123,4 +104,34 @@ pub fn view(model: &mut Model, frame: &mut Frame) {
     let engine = model.toast_engine();
     engine.set_area(main_area);
     engine.render(main_area, frame.buffer_mut());
+}
+
+fn render_list(view: &View, frame: &mut Frame, area: Rect) {
+    let mut current = view.current().to_owned();
+    if !current.is_empty() {
+        current.insert(0, ' ');
+        current.push(' ');
+    }
+
+    let items = view.content();
+
+    let mut state = *view.list_state();
+
+    let sel = match state.selected() {
+        Some(idx) => idx + 1,
+        None => 0,
+    };
+
+    let block = Block::bordered()
+        .title(current.bold())
+        .title_bottom(Line::from(format!(" {}/{} ", sel, items.len())).right_aligned())
+        .border_set(border::THICK);
+
+    let list = List::new(items)
+        .style(Color::Black)
+        .highlight_style(Modifier::REVERSED)
+        .highlight_symbol("> ")
+        .block(block);
+
+    frame.render_stateful_widget(list, area, &mut state);
 }

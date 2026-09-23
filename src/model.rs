@@ -1,7 +1,7 @@
 use std::time::Instant;
 use std::{sync::mpsc::Receiver, time::Duration};
 
-use backend::{Backend, ChangeDirectory, Event};
+use backend::{Backend, ChangeDirection, Event, FileViewContent, TagViewContent};
 use ratatui::layout::Rect;
 use ratatui::widgets::ListState;
 use ratatui_comfy_toaster::{
@@ -10,19 +10,32 @@ use ratatui_comfy_toaster::{
 };
 use throbber_widgets_tui::ThrobberState;
 
+#[derive(Debug, Copy, Clone)]
+pub enum Pane {
+    Files,
+    Tags,
+}
+
 pub struct Model {
     backend: Backend,
     receiver: Receiver<Event>,
     exit: bool,
     connected: bool,
+    active_pane: Pane,
+    fileview: View,
+    tagview: View,
     last_tick: Instant,
-    throbber_state: ThrobberState,
     throbbing: bool,
+    throbber_state: ThrobberState,
     gauge: Option<u16>,
-    current: String,
-    files: Vec<String>,
-    list_state: ListState,
     toast_engine: ToastEngine<()>,
+}
+
+#[derive(Debug, Default)]
+pub struct View {
+    current: String,
+    content: Vec<String>,
+    list_state: ListState,
 }
 
 impl Model {
@@ -34,13 +47,13 @@ impl Model {
             receiver,
             exit: false,
             connected: false,
+            active_pane: Pane::Files,
+            fileview: View::default(),
+            tagview: View::default(),
             last_tick: Instant::now(),
-            throbber_state: ThrobberState::default(),
             throbbing: false,
+            throbber_state: ThrobberState::default(),
             gauge: None,
-            current: String::new(),
-            files: Vec::new(),
-            list_state: ListState::default(),
             toast_engine: ToastEngineBuilder::new(Rect::new(0, 0, 120, 40))
                 .default_duration(Duration::from_secs(3))
                 .default_progress_bar(true)
@@ -61,6 +74,102 @@ impl Model {
         self.exit = true;
     }
 
+    pub fn connected(&self) -> bool {
+        self.connected
+    }
+
+    pub fn set_connected(&mut self, val: bool) {
+        self.connected = val;
+    }
+
+    // pane
+
+    pub fn active_pane(&self) -> Pane {
+        self.active_pane
+    }
+
+    pub fn set_active_pane(&mut self, val: Pane) {
+        self.active_pane = val;
+    }
+
+    // file view
+
+    pub fn sync_files(&self) {
+        self.backend.sync_files();
+    }
+
+    pub fn fileview(&mut self) -> &mut View {
+        &mut self.fileview
+    }
+
+    pub fn fileview_refresh(&mut self, select: Option<String>) {
+        let current = self.backend.fileview_current().pop().unwrap_or_default();
+        let content = match self.backend.fileview_content() {
+            FileViewContent::Folders(folders) => folders,
+            FileViewContent::Files { .. } => Vec::new(),
+        };
+        self.fileview = View::new(current, content, select);
+    }
+
+    pub fn fileview_enter(&mut self) {
+        if let Some(dir) = self.fileview.enter() {
+            self.backend
+                .fileview_change(ChangeDirection::ToChild(dir))
+                .unwrap();
+            self.fileview_refresh(None);
+        }
+    }
+
+    pub fn fileview_leave(&mut self) {
+        if self.fileview.leave() {
+            self.backend
+                .fileview_change(ChangeDirection::ToParent)
+                .unwrap();
+            self.fileview_refresh(Some(self.fileview.current.clone()));
+        }
+    }
+
+    // tag view
+
+    pub fn sync_tags(&self) {
+        self.backend.sync_tags();
+    }
+
+    pub fn tagview(&mut self) -> &mut View {
+        &mut self.tagview
+    }
+
+    pub fn tagview_refresh(&mut self, select: Option<String>) {
+        let current = self.backend.tagview_current().pop().unwrap_or_default();
+        let content = match self.backend.tagview_content() {
+            TagViewContent::Genres(v)
+            | TagViewContent::Artists(v)
+            | TagViewContent::Albums(v)
+            | TagViewContent::Titles(v) => v,
+        };
+        self.tagview = View::new(current, content, select);
+    }
+
+    pub fn tagview_enter(&mut self) {
+        if let Some(dir) = self.tagview.enter() {
+            self.backend
+                .tagview_change(ChangeDirection::ToChild(dir))
+                .unwrap();
+            self.tagview_refresh(None);
+        }
+    }
+
+    pub fn tagview_leave(&mut self) {
+        if self.tagview.leave() {
+            self.backend
+                .tagview_change(ChangeDirection::ToParent)
+                .unwrap();
+            self.tagview_refresh(Some(self.tagview.current.clone()));
+        }
+    }
+
+    // misc
+
     pub fn tick(&mut self) {
         self.throbber_state.calc_next();
         self.toast_engine().tick();
@@ -69,28 +178,6 @@ impl Model {
 
     pub fn last_tick(&self) -> Instant {
         self.last_tick
-    }
-
-    pub fn set_toast(&mut self, text: String) {
-        self.toast_engine.show_toast(
-            ToastBuilder::new(text.into())
-                .preset(ToastPreset::CompactHighlightStart, "Error")
-                .toast_type(ToastType::Error)
-                .position(ToastPosition::TopRight)
-                .offset(0, 1),
-        );
-    }
-
-    pub fn toast_engine(&mut self) -> &mut ToastEngine<()> {
-        &mut self.toast_engine
-    }
-
-    pub fn connected(&self) -> bool {
-        self.connected
-    }
-
-    pub fn set_connected(&mut self, val: bool) {
-        self.connected = val;
     }
 
     pub fn throbbing(&self) -> bool {
@@ -113,59 +200,36 @@ impl Model {
         self.gauge = val;
     }
 
-    pub fn sync_files(&self) {
-        self.backend.sync_files();
+    pub fn set_toast(&mut self, text: String) {
+        self.toast_engine.show_toast(
+            ToastBuilder::new(text.into())
+                .preset(ToastPreset::CompactHighlightStart, "Error:")
+                .toast_type(ToastType::Error)
+                .position(ToastPosition::TopRight)
+                .offset(0, 1),
+        );
     }
 
-    pub fn sync_tags(&self) {
-        self.backend.sync_tags();
+    pub fn toast_engine(&mut self) -> &mut ToastEngine<()> {
+        &mut self.toast_engine
     }
+}
 
-    pub fn refresh_file_list(&mut self) {
-        if let Ok(mut c) = self.backend.current_directory() {
-            self.current = c.pop().unwrap();
-        }
-        if let Ok(c) = self.backend.directory_content() {
-            self.files = c.dirs;
-        }
-        if self.files.is_empty() {
-            self.list_state.select(None);
+impl View {
+    fn new(current: String, content: Vec<String>, select: Option<String>) -> Self {
+        let list_state = if content.is_empty() {
+            ListState::default()
+        } else if let Some(sel) = &select
+            && let Some(idx) = content.iter().position(|s| s == sel)
+        {
+            ListState::default().with_selected(Some(idx))
         } else {
-            self.list_state.select_first();
-        }
-    }
-
-    pub fn select_next(&mut self) {
-        if let Some(cur) = self.list_state.selected()
-            && cur + 1 < self.files.len()
-        {
-            self.list_state.select_next();
-        }
-    }
-
-    pub fn select_prev(&mut self) {
-        if self.list_state.selected().is_some() {
-            self.list_state.select_previous();
-        }
-    }
-
-    pub fn enter_dir(&mut self) {
-        if let Some(cur) = self.list_state.selected()
-            && let Some(dir) = self.files.get(cur)
-        {
-            self.backend
-                .change_directory(ChangeDirectory::ToChild(dir))
-                .unwrap();
-            self.refresh_file_list();
-        }
-    }
-
-    pub fn leave_dir(&mut self) {
-        if !self.current().is_empty() {
-            self.backend
-                .change_directory(ChangeDirectory::ToParent)
-                .unwrap();
-            self.refresh_file_list();
+            ListState::default().with_selected(Some(0))
+        };
+        Self {
+            current,
+            content,
+            list_state,
         }
     }
 
@@ -173,11 +237,41 @@ impl Model {
         &self.current
     }
 
-    pub fn files(&self) -> Vec<&str> {
-        self.files.iter().map(AsRef::as_ref).collect()
+    pub fn content(&self) -> Vec<&str> {
+        self.content.iter().map(AsRef::as_ref).collect()
     }
 
     pub fn list_state(&self) -> &ListState {
         &self.list_state
+    }
+
+    pub fn select_next(&mut self) {
+        if let Some(idx) = self.list_state.selected()
+            && idx + 1 < self.content.len()
+        {
+            self.list_state.select_next();
+        }
+    }
+
+    pub fn select_prev(&mut self) {
+        if let Some(idx) = self.list_state.selected()
+            && idx > 0
+        {
+            self.list_state.select_previous();
+        }
+    }
+
+    fn enter(&mut self) -> Option<&String> {
+        if let Some(idx) = self.list_state.selected()
+            && let Some(dir) = self.content.get(idx)
+        {
+            Some(dir)
+        } else {
+            None
+        }
+    }
+
+    fn leave(&mut self) -> bool {
+        !self.current.is_empty()
     }
 }
